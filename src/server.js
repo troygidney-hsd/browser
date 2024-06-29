@@ -119,6 +119,7 @@ let launchChromium = async function(url) {
         '--disable-session-crashed-bubble',
         '--check-for-update-interval=31536000',
         '--disable-dev-shm-usage', // TODO: work out if we can enable this for devices with >1Gb of memory
+		'--load-extension=/usr/src/app/autoscroll-extension'
       ];
 
       // Merge the chromium default and balena default flags
@@ -206,6 +207,17 @@ async function main(){
   await launchChromium(url);
 }
 
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const iface of Object.values(interfaces)) {
+      for (const alias of iface) {
+          if (alias.family === 'IPv4' && !alias.internal) {
+              return alias.address;
+          }
+      }
+  }
+  return '0.0.0.0'; // Fallback if no address is found
+}
 
 main().catch(err => {
   console.log("Main error: ", err);
@@ -234,6 +246,11 @@ app.use(function(req, res, next) {
 });
 app.use(errorHandler);
 
+// LocalIP endpoint
+app.get('/local-ip', (req, res) => {
+  res.send({ ip: getLocalIP() });
+});
+
 // ping endpoint
 app.get('/ping', (req, res) => {
     
@@ -244,6 +261,12 @@ app.get('/ping', (req, res) => {
 app.post('/url', (req, res) => {
   if (!req.body.url) {
     return res.status(400).send('Bad request: missing URL in the body element');
+  }
+
+
+  if (req.body.url == "reset") {
+	  launchChromium("file:///home/chromium/index.html");
+	  return res.status(200).send('ok');
   }
 
   let url = req.body.url;
@@ -268,7 +291,7 @@ app.post('/url', (req, res) => {
 // url get endpoint
 app.get('/url', (req, res) => {
     
-  return res.status(200).send(currentUrl);
+  return res.status(200).json({ url: currentUrl });
 });
 
 // refresh endpoint
@@ -382,10 +405,35 @@ app.post('/scan', (req, res) => {
   return res.status(200).send('ok');
 });
 
-app.listen(API_PORT, () => {
+app.listen(API_PORT, '0.0.0.0', () => {
   console.log('Browser API running on port: ' + API_PORT);
 });
 
 process.on('SIGINT', () => {
   process.exit();
 });
+
+
+
+
+
+
+
+
+
+
+// Web server to serve an HTML file
+const webApp = express();
+
+webApp.use(express.static('/home/chromium'));
+
+webApp.get('/', (req, res) => {
+  res.sendFile(path.join('/home/chromium', 'index.html'));
+});
+
+const WEB_PORT = 8081;
+webApp.listen(WEB_PORT, () => {
+  console.log('Web server running on port: ' + WEB_PORT);
+});
+
+

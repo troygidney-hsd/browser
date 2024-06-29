@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Auto Scroll Toggle",
+  "version": "1.0",
+  "description": "Scrolls a webpage automatically based on a URL key.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+	"tabs",
+	"http://*/*",
+    "https://*/*"
+  ],
+  "host_permissions": ["*://*/*"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["background.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

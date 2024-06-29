@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser API Interaction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+        }
+
+        form {
+            background: #fff;
+            padding: 20px;
+            margin: 20px auto;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        button {
+            margin-bottom: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            width: calc(100% - 22px);
+            box-sizing: border-box;
+        }
+
+        input[type="radio"] {
+            margin-right: 5px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #ipAddress {
+            text-align: center;
+            font-size: 18px;
+            margin: 20px 0;
+        }
+
+        #currentUrl {
+            text-align: center;
+            font-size: 18px;
+            margin: 20px 0;
+        }
+
+        .radio-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .radio-group label {
+            margin-right: 10px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            visibility: hidden;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading .spinner {
+            visibility: visible;
+        }
+    </style>
+</head>
+<body>
+    <h1>Browser API Interaction Form</h1>
+
+    <div id="currentUrl"></div>
+    <div id="ipAddress"></div>
+
+    <form id="baseURLForm">
+        <label for="baseUrl">Enter Base URL:</label>
+        <input type="text" id="baseUrl" name="baseUrl" placeholder="Enter Base URL (e.g., https://example.com)">
+        <button type="button" onclick="updateBaseUrl()">Update <span class="spinner"></span></button>
+    </form>
+
+    <form id="urlForm">
+        <label for="url">Set URL:</label>
+        <input type="text" id="url" name="url" placeholder="Enter URL">
+        <button type="button" onclick="submitForm('url', 'POST')">Set URL <span class="spinner"></span></button>
+    </form>
+
+    <form id="refreshForm">
+        <button type="button" onclick="submitForm('refresh', 'POST')">Refresh Page <span class="spinner"></span></button>
+    </form>
+
+    <form id="currentUrlForm">
+        <button type="button" onclick="getCurrentUrl()">Get Current URL <span class="spinner"></span></button>
+    </form>
+
+    <form id="gpuForm">
+        <div class="radio-group">
+            <label>Enable GPU:</label>
+            <input type="radio" id="gpuEnable" name="gpu" value="1">
+            <label for="gpuEnable">Enable</label>
+            <input type="radio" id="gpuDisable" name="gpu" value="0">
+            <label for="gpuDisable">Disable</label>
+        </div>
+        <button type="button" onclick="submitToggleForm('gpu')">Update GPU <span class="spinner"></span></button>
+    </form>
+
+    <form id="kioskForm">
+        <div class="radio-group">
+            <label>Enable Kiosk Mode:</label>
+            <input type="radio" id="kioskEnable" name="kiosk" value="1">
+            <label for="kioskEnable">Enable</label>
+            <input type="radio" id="kioskDisable" name="kiosk" value="0">
+            <label for="kioskDisable">Disable</label>
+        </div>
+        <button type="button" onclick="submitToggleForm('kiosk')">Update Kiosk Mode <span class="spinner"></span></button>
+    </form>
+
+    <!-- JavaScript to fetch and display IP address -->
+    <script>
+        // Define initial base URL
+        let baseUrl = 'https://example.com:5011';
+
+
+        async function fetchServerIPAddress() {
+            function extractIPAddress(url) {
+                try {
+                    const parsedURL = new URL(url);
+                    const hostname = parsedURL.hostname;
+                    // Validate the extracted hostname to see if it is an IP address
+                    const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+                    if (ipRegex.test(hostname)) {
+                        return hostname;
+                    } else {
+                        throw new Error('Invalid IP address in URL');
+                    }
+                } catch (error) {
+                    console.error('Error extracting IP address:', error);
+                    return null;
+                }
+            }
+
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'HEAD'  // Using HEAD to get headers only
+                });
+                if (!response.ok) {
+                    throw new Error('Network response was not ok.');
+                }
+
+                // Extract the IP address from the current URL
+                const serverIP = extractIPAddress(response.url);
+                if (!serverIP) {
+                    throw new Error('IP address not found in URL');
+                }
+
+                return serverIP;
+            } catch (error) {
+                console.error('Error fetching server IP address:', error);
+                return 'Unknown';
+            }
+        }
+
+        // Example usage
+        fetchServerIPAddress().then(ip => {
+            console.log('Server IP address:', ip);
+        });
+
+
+
+
+        async function fetchIPAddress() {
+            try {
+                const response = await fetch('http://localhost:5011/local-ip');
+                if (!response.ok) {
+                    throw new Error('Network response was not ok.');
+                }
+                const data = await response.json();
+                return data.ip;
+            } catch (error) {
+                console.error('Error fetching IP address:', error);
+                return 'Unknown';
+            }
+        }
+
+        // Function to update the displayed IP address
+        async function updateIPAddress() {
+            const ipAddressContainer = document.getElementById('ipAddress');
+            const baseURLElement = document.getElementById('baseUrl');
+            fetchServerIPAddress().then(ip => {
+                ipAddressContainer.textContent = `Server IP Address: ${ip}`;
+                baseURLElement.value = `${ip}`;
+
+             updateBaseUrl();
+             getCurrentUrl();
+            })
+
+        }
+
+        // Function to update base URL
+        function updateBaseUrl() {
+            let newBaseUrl = document.getElementById('baseUrl').value.trim();
+            if (newBaseUrl !== '') {
+                if (!newBaseUrl.startsWith('http://') && !newBaseUrl.startsWith('https://')) {
+                    newBaseUrl = 'http://' + newBaseUrl;
+                }
+                baseUrl = newBaseUrl + ":5011";
+                console.log('Base URL updated:', baseUrl);
+            } else {
+                console.error('Base URL cannot be empty!');
+            }
+        }
+
+        // Function to submit forms with dynamic base URL and method
+        async function submitForm(endpoint, method) {
+            try {
+                const form = document.getElementById(`${endpoint}Form`);
+                const button = form.querySelector('button');
+                button.classList.add('loading');
+
+                const formData = new FormData(form);
+                const requestOptions = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: method === 'GET' || method === 'HEAD' ? null : new URLSearchParams(formData).toString()
+                };
+                const response = await fetch(`${baseUrl}/${endpoint}`, requestOptions);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                console.log(`${endpoint} request successful!`);
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                const form = document.getElementById(`${endpoint}Form`);
+                const button = form.querySelector('button');
+                button.classList.remove('loading');
+            }
+        }
+
+        // Function to submit forms with toggle values in the URL
+        async function submitToggleForm(endpoint) {
+            try {
+                const form = document.getElementById(`${endpoint}Form`);
+                const button = form.querySelector('button');
+                button.classList.add('loading');
+
+                const formData = new FormData(form);
+                const value = formData.get(endpoint);
+                const requestOptions = {
+                    method: 'POST',
+                };
+                const response = await fetch(`${baseUrl}/${endpoint}/${value}`, requestOptions);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                console.log(`${endpoint} request successful!`);
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                const form = document.getElementById(`${endpoint}Form`);
+                const button = form.querySelector('button');
+                button.classList.remove('loading');
+            }
+        }
+
+    async function getCurrentUrl() {
+        const form = document.getElementById('currentUrlForm');
+        const button = form.querySelector('button');
+        const currentUrlContainer = document.getElementById('currentUrl');
+        button.classList.add('loading');
+
+        try {
+            const response = await fetch(`${baseUrl}/url`, { method: 'GET' });
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.dir(data);
+            currentUrlContainer.textContent = `Current URL: ${data.url}`;
+        } catch (error) {
+            console.error('Error:', error);
+            currentUrlContainer.textContent = 'Error fetching current URL';
+        } finally {
+            button.classList.remove('loading');
+        }
+    }
+
+        updateIPAddress();
+    </script>
+</body>
+</html>
