@@ -9,5 +9,6 @@ services:
     build: .
     privileged: true # required for UDEV to find plugged in peripherals such as a USB mouse
     network_mode: host
+    #user: "0:0"
     volumes:
       - 'settings:/data' # Only required if using PERSISTENT flag (see below)

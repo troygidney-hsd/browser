@@ -109,17 +109,20 @@
 
     <div id="currentUrl"></div>
     <div id="ipAddress"></div>
+    <div id="groupAddress"></div>
+
 
     <form id="baseURLForm">
         <label for="baseUrl">Enter Base URL:</label>
         <input type="text" id="baseUrl" name="baseUrl" placeholder="Enter Base URL (e.g., https://example.com)">
-        <button type="button" onclick="updateBaseUrl()">Update <span class="spinner"></span></button>
+        <button type="button" onclick="updateBaseUrl()">Update Server<span class="spinner"></span></button>
     </form>
 
     <form id="urlForm">
-        <label for="url">Set URL:</label>
+        <label for="url">Set the displayed URL:</label>
         <input type="text" id="url" name="url" placeholder="Enter URL">
-        <button type="button" onclick="submitForm('url', 'POST')">Set URL <span class="spinner"></span></button>
+        <button type="button" onclick="submitForm('url', 'POST')">Set Single URL <span class="spinner"></span></button>
+        <button type="button" onclick="setAllUrlsFromGroupDevices()">Set ALL Urls</button>
     </form>
 
     <form id="refreshForm">
@@ -149,7 +152,7 @@
             <input type="radio" id="kioskDisable" name="kiosk" value="0">
             <label for="kioskDisable">Disable</label>
         </div>
-        <button type="button" onclick="submitToggleForm('kiosk')">Update Kiosk Mode <span class="spinner"></span></button>
+        <button type="button" onclick="submitToggleForm('kiosk')">Update Kiosk Mode (Full Screen)<span class="spinner"></span></button>
     </form>
 
     <!-- JavaScript to fetch and display IP address -->
@@ -324,6 +327,74 @@
         }
     }
 
+    let groupDevices = {};
+    async function scanForDevices() {
+    try {
+        const ip = await fetchServerIPAddress();
+
+        const response = await fetch('http://'+ ip +':5011/scansubnet');
+        const data = await response.json();
+        
+        groupDevices = JSON.parse(data);
+
+        return groupDevices;
+
+    } catch (error) {
+        console.error("Error scanning devices:", error);
+        return null;
+    }
+}
+
+        async function setAllUrlsFromGroupDevices() {
+            const ips = [];
+
+            let groupedDevices;
+
+            if (Object.keys(groupDevices).length <= 0) {
+                groupedDevices = await scanForDevices();
+                groupDevices = groupedDevices;
+            }
+
+            for (const ip in groupDevices) {
+                ips.push(ip);
+            }
+
+            submitAllFormForGroupDevice('url', 'POST', ips);
+        }
+
+        // Function to submit forms with dynamic base URL and method
+        async function submitAllFormForGroupDevice(endpoint, method, ips) {
+            try {
+                const form = document.getElementById(`${endpoint}Form`);
+                const button = form.querySelector('button');
+                button.classList.add('loading');
+
+                const formData = new FormData(form);
+                const requestOptions = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: method === 'GET' || method === 'HEAD' ? null : new URLSearchParams(formData).toString()
+                };
+
+                for (ip of ips) {
+                    const response = await fetch(`http://${ip}:5011/${endpoint}`, requestOptions);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                }
+
+                console.log(`${endpoint} request successful!`);
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                const form = document.getElementById(`${endpoint}Form`);
+                const button = form.querySelector('button');
+                button.classList.remove('loading');
+            }
+        }
+     
         updateIPAddress();
     </script>
 </body>

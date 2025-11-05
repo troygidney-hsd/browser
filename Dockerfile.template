@@ -25,6 +25,17 @@ RUN mkdir -p /etc/chromium/policies
 RUN mkdir -p /etc/chromium/policies/recommended
 COPY ./policy.json /etc/chromium/policies/recommended/my_policy.json
 
+
+
+
+# after Node is installed
+RUN apt-get update && apt-get install -y --no-install-recommends libcap2-bin \
+ && setcap 'cap_net_bind_service=+ep' $(command -v node)
+
+
+
+
+
 # Add chromium user
 RUN useradd chromium -m -s /bin/bash -G root || true && \
     groupadd -r -f chromium && id -u chromium || true \
@@ -44,3 +55,12 @@ COPY VERSION .
 
 # Start app
 CMD ["bash", "/usr/src/app/start.sh"]
+
+
+# RUN npm install
+
+# CMD ["bash", "pwd"]
+# CMD ["bash", "npm init"]
+# CMD ["bash", "npm install express"]
+
+# COPY package*.json /app/

@@ -12,6 +12,10 @@ const { spawn } = require('child_process');
 const { readFile, unlink } = require('fs').promises;
 const path = require('path');
 const os = require('os');
+const https = require('https');
+const http = require('http');
+const fs = require('fs');
+const net = require("net");
 
 // Bring in the static environment variables
 const API_PORT = parseInt(process.env.API_PORT) || 5011;
@@ -58,7 +62,7 @@ async function getUrlToDisplayAsync() {
 
     // make a HTTP/S request for each supported port to the localhost
     // add the URL to the array if HTTP200 is returned
-    let ports = [80,443,8080];
+    let ports = [80,8443,8081];
     let returnURL = null;
     let urls = []
     for await (const port of ports) {
@@ -119,7 +123,7 @@ let launchChromium = async function(url) {
         '--disable-session-crashed-bubble',
         '--check-for-update-interval=31536000',
         '--disable-dev-shm-usage', // TODO: work out if we can enable this for devices with >1Gb of memory
-		'--load-extension=/usr/src/app/autoscroll-extension'
+                '--load-extension=/usr/src/app/autoscroll-extension'
       ];
 
       // Merge the chromium default and balena default flags
@@ -265,8 +269,8 @@ app.post('/url', (req, res) => {
 
 
   if (req.body.url == "reset") {
-	  launchChromium("file:///home/chromium/index.html");
-	  return res.status(200).send('ok');
+          launchChromium("file:///home/chromium/index.html");
+          return res.status(200).send('ok');
   }
 
   let url = req.body.url;
@@ -414,6 +418,63 @@ process.on('SIGINT', () => {
 });
 
 
+async function checkPort(ip, port) {
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+        const timeout = 50; // Timeout in milliseconds
+
+        socket.setTimeout(timeout);
+        socket.on('connect', () => {
+            socket.destroy();
+            resolve(true);
+        });
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve(false);
+        });
+        socket.on('error', () => {
+            socket.destroy();
+            resolve(false);
+        });
+        
+        socket.connect(port, ip);
+    });
+}
+
+async function scanIP(baseIP, ports) {
+    const results = {};
+
+    for (let i = 11; i <= 11; i++) {
+        for (let j = 29; j <= 45; j++) {
+            const ip = `${baseIP.split('.')[0]}.${baseIP.split('.')[1]}.${i}.${j}`;
+            let openPorts = {};
+
+            for (const port of ports) {
+                console.log("Scanning " + ip + ":" + port);
+                const isOpen = await checkPort(ip, port);
+                if (isOpen) {
+                    openPorts[port] = true;
+                }
+            }
+            
+            if (Object.keys(openPorts).length > 0) {
+                results[ip] = openPorts;
+            }
+        }
+    }
+    
+    return results;
+}
+
+// API Endpoint to trigger subnet scan
+app.get("/scansubnet", async (req, res) => {
+    console.log("Scanning subnet...");
+   
+    const ports = [5011];
+    const scanResults = await scanIP(getLocalIP(), ports);
+   
+    res.json(JSON.stringify(scanResults));
+});
 
 
 
@@ -423,17 +484,59 @@ process.on('SIGINT', () => {
 
 
 // Web server to serve an HTML file
-const webApp = express();
+// const webApp = express();
 
+// webApp.use(express.static('/home/chromium'));
+
+// webApp.get('/', (req, res) => {
+//   res.sendFile(path.join('/home/chromium', 'index.html'));
+// });
+
+// const WEB_PORT = 8081;
+// webApp.listen(WEB_PORT, () => {
+//   console.log('Web server running on port: ' + WEB_PORT);
+// });
+
+
+// const webApp = express();
+// webApp.use(express.static('/home/chromium'));
+
+// webApp.get('/', (req, res) => {
+//   res.sendFile(path.join('/home/chromium', 'index.html'));
+// });
+
+const WEB_PORT = 80;
+const SSL_WEB_PORT = 443;
+
+
+// const httpsServer = https.createServer({
+//   cert: fs.readFileSync(path.join(__dirname, '/ssl/certificate.pem')),
+//   key: fs.readFileSync(path.join(__dirname + '/ssl/key.pem')),
+// }, function(req, res) {
+//   res.sendFile(path.join('/home/chromium', 'index.html'));
+// });
+// httpsServer.listen(WEB_PORT, () => {
+//   console.log('Web server running on port: ' + WEB_PORT);
+// });
+
+var options = {
+  cert: fs.readFileSync(path.join(__dirname, '/ssl/certificate.pem')),
+  key: fs.readFileSync(path.join(__dirname + '/ssl/key.pem'))
+}
+
+const webApp = express();
 webApp.use(express.static('/home/chromium'));
 
-webApp.get('/', (req, res) => {
+
+
+
+http.createServer(webApp.get('/', (req, res) => {
   res.sendFile(path.join('/home/chromium', 'index.html'));
-});
-
-const WEB_PORT = 8081;
-webApp.listen(WEB_PORT, () => {
-  console.log('Web server running on port: ' + WEB_PORT);
-});
+}))
+.listen(WEB_PORT, () => {console.log("HTTP started")});
 
 
+https.createServer(options, webApp.get('/', (req, res) => {
+  res.sendFile(path.join('/home/chromium', 'index.html'));
+}))
+.listen(SSL_WEB_PORT, () => {console.log("HTTP started")});
